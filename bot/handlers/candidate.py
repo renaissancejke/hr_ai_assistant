@@ -1,3 +1,4 @@
+# bot/handlers/candidate.py
 import os, datetime, pathlib
 from uuid import uuid4
 
@@ -7,11 +8,7 @@ from aiogram.fsm.context import FSMContext
 
 from settings.config import setup
 from vacancies import VACANCIES
-from bot.keyboards import (
-    MAIN_REPLY_KB,
-    post_upload_kb,
-    vacancy_inline_kb,
-)
+from bot.keyboards import POST_UPLOAD_KB, vacancy_inline_kb
 from bot.handlers.resume import process_resume, extract_text
 
 router = Router()
@@ -21,9 +18,8 @@ router = Router()
 async def cmd_start(msg: types.Message, state: FSMContext) -> None:
 
     await msg.answer(
-        "Привет! Нажмите кнопку <b>«Посмотреть вакансии»</b> "
-        "или выберите вакансию из списка:",
-        reply_markup=MAIN_REPLY_KB,
+        "Привет! Выберите вакансию из списка ниже:",
+        reply_markup=types.ReplyKeyboardRemove(),
     )
     await msg.answer(
         "Актуальные вакансии:",
@@ -34,25 +30,19 @@ async def cmd_start(msg: types.Message, state: FSMContext) -> None:
 
 @router.message(Command("info"))
 async def cmd_info(msg: types.Message) -> None:
-
-    text = (
+    await msg.answer(
         "<b>🤖 HR-Assistant Bot</b>\n\n"
-        "Бот принимает ваше резюме и автоматически сравнивает его "
-        "с требованиями открытых вакансий.\n\n"
-        "👉 <b>Как пользоваться</b>\n"
-        "1️⃣ Нажмите «👀 Посмотреть вакансии» или выполните /start\n"
-        "2️⃣ Выберите вакансию\n"
-        "3️⃣ Отправьте PDF, DOC/DOCX или TXT с резюме\n"
-        "4️⃣ Бот рассчитает рейтинг и передаст отчёт HR-команде\n\n"
-        "После загрузки появится кнопка «📄 Моё резюме» — "
-        "она всегда покажет последний отправленный файл."
+        "1️⃣ Выберите вакансию (/start)\n"
+        "2️⃣ Пришлите PDF, DOC/DOCX или TXT с резюме\n"
+        "3️⃣ Бот проанализирует файл и отправит отчёт HR\n\n"
+        "После загрузки появится кнопка «👀 Посмотреть вакансии» - "
+        "ею можно открыть список вакансий снова, а «📄 Моё резюме» "
+        "покажет последний отправленный файл."
     )
-    await msg.answer(text)
 
 
 @router.message(F.text == "👀 Посмотреть вакансии")
 async def show_vacancies(msg: types.Message, state: FSMContext) -> None:
-
     await msg.answer(
         "Актуальные вакансии:",
         reply_markup=vacancy_inline_kb(),
@@ -84,7 +74,7 @@ async def choose_vacancy(cb: types.CallbackQuery, state: FSMContext) -> None:
 async def handle_document(msg: types.Message, state: FSMContext) -> None:
     data = await state.get_data()
     if "vacancy" not in data:
-        await msg.answer("Сначала выберите вакансию (кнопка или /start).")
+        await msg.answer("Сначала выберите вакансию через /start.")
         return
 
     filename = (msg.document.file_name or "").lower()
@@ -102,7 +92,6 @@ async def handle_document(msg: types.Message, state: FSMContext) -> None:
     await msg.bot.download_file(file_info.file_path, destination=path)
 
     resume_txt = extract_text(path)
-
     vacancy_name = data["vacancy"]
     vacancy_text = VACANCIES[vacancy_name]
     meta = await process_resume(
@@ -114,11 +103,10 @@ async def handle_document(msg: types.Message, state: FSMContext) -> None:
     )
 
     await state.update_data(resume_file_id=msg.document.file_id)
-
     await msg.answer(
-        "Спасибо! Ответим в течение недели.\n"
+        "Спасибо! Мы свяжемся с вами после рассмотрения.\n"
         "Подпишитесь на @rakestep, чтобы не пропустить новости.",
-        reply_markup=post_upload_kb(),
+        reply_markup=POST_UPLOAD_KB,
     )
 
     caption = (

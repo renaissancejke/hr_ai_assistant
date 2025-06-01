@@ -7,30 +7,19 @@ from aiogram.types import (
 
 from vacancies import VACANCIES
 
-
-MAIN_REPLY_KB = ReplyKeyboardMarkup(
-    keyboard=[[KeyboardButton(text="👀 Посмотреть вакансии")]],
+POST_UPLOAD_KB = ReplyKeyboardMarkup(
+    keyboard=[
+        [
+            KeyboardButton(text="👀 Посмотреть вакансии"),
+            KeyboardButton(text="📄 Моё резюме"),
+        ]
+    ],
     resize_keyboard=True,
     is_persistent=True,
 )
 
 
-def post_upload_kb() -> ReplyKeyboardMarkup:
-
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [
-                KeyboardButton(text="👀 Посмотреть вакансии"),
-                KeyboardButton(text="📄 Моё резюме"),
-            ]
-        ],
-        resize_keyboard=True,
-        is_persistent=True,
-    )
-
-
 def vacancy_inline_kb() -> InlineKeyboardMarkup:
-
     if VACANCIES:
         rows = [
             [InlineKeyboardButton(text=v, callback_data=f"vac|{v}")] for v in VACANCIES
