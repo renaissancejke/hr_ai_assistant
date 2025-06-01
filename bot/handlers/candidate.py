@@ -120,3 +120,9 @@ async def handle_document(msg: types.Message, state: FSMContext) -> None:
         msg.document.file_id,
         caption=caption,
     )
+
+
+@router.message()
+async def catch_all(msg: types.Message) -> None:
+
+    await msg.answer("ℹ️ Воспользуйтесь меню, чтобы увидеть список доступных команд.")
