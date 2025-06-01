@@ -29,8 +29,8 @@ async def main() -> None:
 
     await bot.set_my_commands(
         [
-            BotCommand("start", "начать работу"),
-            BotCommand("info", "как пользоваться ботом"),
+            BotCommand(command="start", description="начать работу"),
+            BotCommand(command="info", description="как пользоваться ботом"),
         ]
     )
 
