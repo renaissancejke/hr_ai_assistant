@@ -1,5 +1,6 @@
 import json
 import os
+
 from settings.config import setup
 
 VACANCIES_FILE = setup.vacancies_file

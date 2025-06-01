@@ -1,5 +1,5 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -11,7 +11,6 @@ class Settings(BaseSettings):
 
     database_url: str | None = Field(None, env="DATABASE_URL")
 
-    #  ──  конфиг Pydantic  ──
     model_config = SettingsConfigDict(
         env_file=".env",
         extra="ignore",

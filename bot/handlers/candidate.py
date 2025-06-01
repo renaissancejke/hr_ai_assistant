@@ -1,15 +1,16 @@
-# bot/handlers/candidate.py
-import os, datetime, pathlib
+import datetime
+import os
+import pathlib
 from uuid import uuid4
 
-from aiogram import Router, types, F
-from aiogram.filters import CommandStart, Command
+from aiogram import F, Router, types
+from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 
+from bot.handlers.resume import extract_text, process_resume
+from bot.keyboards import POST_UPLOAD_KB, vacancy_inline_kb
 from settings.config import setup
 from vacancies import VACANCIES
-from bot.keyboards import POST_UPLOAD_KB, vacancy_inline_kb
-from bot.handlers.resume import process_resume, extract_text
 
 router = Router()
 
@@ -18,7 +19,7 @@ router = Router()
 async def cmd_start(msg: types.Message, state: FSMContext) -> None:
 
     await msg.answer(
-        "Привет! Выберите вакансию из списка ниже:",
+        "Выберите вакансию из списка ниже:",
         reply_markup=types.ReplyKeyboardRemove(),
     )
     await msg.answer(
