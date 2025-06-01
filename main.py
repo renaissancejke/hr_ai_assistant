@@ -3,6 +3,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.storage.memory import MemoryStorage
 from settings.config import setup
+from aiogram.types import BotCommand
 
 from bot.handlers.candidate import router as candidate_router
 
@@ -18,6 +19,13 @@ async def main():
     )
     dp = Dispatcher(storage=MemoryStorage())
     dp.include_router(candidate_router)
+    await bot.set_my_commands(
+        [
+            BotCommand(command="start", description="Начать работу"),
+            BotCommand(command="info", description="Как пользоваться ботом"),
+        ]
+    )
+    await bot.delete_webhook(drop_pending_updates=True)
 
     await dp.start_polling(bot)
 

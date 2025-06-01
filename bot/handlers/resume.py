@@ -1,8 +1,11 @@
 import os, json, uuid, datetime, openai, logging
+import pathlib
 from typing import Dict, Any
 from settings.config import Settings
 from db import save_record
 from openai import AsyncOpenAI
+from docx import Document
+from pdfminer.high_level import extract_text as pdf_text
 
 settings = Settings()
 client = AsyncOpenAI(api_key=settings.openai_api_key)
@@ -21,6 +24,9 @@ def tag_by_score(score: float) -> str:
 
 async def analyse_resume(resume_text: str, vacancy_text: str) -> dict:
     prompt = f"""
+Привет, ты HR it-компании. Тебе нужно проанализировать резюме кандидата. Ты должен определить общий рейтинг кандидата,
+в зависимости от соответствия резюме требованиям вакансии, написать саммари по его опыту и дать советы для интрвьюера
+по данному кандидату.
 Вакансия:
 {vacancy_text}
 
@@ -65,3 +71,16 @@ async def process_resume(
     }
     save_record(meta, settings.data_dir)
     return meta
+
+
+def extract_text(file_path: str) -> str:
+    ext = pathlib.Path(file_path).suffix.lower()
+    if ext == ".txt":
+        with open(file_path, encoding="utf-8", errors="ignore") as f:
+            return f.read()
+    if ext == ".pdf":
+        return pdf_text(file_path)
+    if ext in {".doc", ".docx"}:
+        doc = Document(file_path)
+        return "\n".join(p.text for p in doc.paragraphs)
+    raise ValueError("Unsupported file type")
