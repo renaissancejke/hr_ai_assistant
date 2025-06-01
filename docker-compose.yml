@@ -1,0 +1,14 @@
+version: "3.13"
+
+services:
+  bot:
+    build: .
+    container_name: hr_assistant_bot
+    environment:
+      TELEGRAM_TOKEN:  "${TELEGRAM_TOKEN}"
+      OPENAI_API_KEY:  "${OPENAI_API_KEY}"
+      SUMMARY_CHAT_ID: "${SUMMARY_CHAT_ID}"
+      DATA_DIR:        "/data/resumes"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped

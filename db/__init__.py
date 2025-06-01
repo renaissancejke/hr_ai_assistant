@@ -1,6 +1,6 @@
 import json
 import os
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 
 def save_record(meta: Dict[str, Any], data_dir: str) -> None:

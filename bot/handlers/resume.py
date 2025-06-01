@@ -1,11 +1,18 @@
-import os, json, uuid, datetime, openai, logging
+import datetime
+import json
+import logging
+import os
 import pathlib
-from typing import Dict, Any
-from settings.config import Settings
-from db import save_record
-from openai import AsyncOpenAI
+import uuid
+from typing import Any, Dict
+
+import openai
 from docx import Document
+from openai import AsyncOpenAI
 from pdfminer.high_level import extract_text as pdf_text
+
+from db import save_record
+from settings.config import Settings
 
 settings = Settings()
 client = AsyncOpenAI(api_key=settings.openai_api_key)
