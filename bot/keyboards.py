@@ -28,3 +28,13 @@ def vacancy_inline_kb() -> InlineKeyboardMarkup:
     ] or [[InlineKeyboardButton(text="Нет вакансий", callback_data="none")]]
 
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+GET_TIPS_KB = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [
+            InlineKeyboardButton(text="✅ Да, хочу советы", callback_data="tips|yes"),
+            InlineKeyboardButton(text="❌ Нет, спасибо", callback_data="tips|no"),
+        ]
+    ]
+)

@@ -42,11 +42,18 @@ def extract_text(file_path: str) -> str:
 
 async def analyse_resume(resume: str, vacancy: str) -> dict[str, Any]:
     prompt = f"""
-Ты HR-специалист. Сравни резюме с требованиями вакансии и верни JSON:
+Ты – опытный IT-HR. Проанализируй резюме и сравни его с вакансией и верни JSON строго этого формата:
 {{
-  "rating": 0-100,
-  "summary": "до 300 симв.",
-  "interview_tips": "короткие советы"
+  "rating": 0-100,                       # целое число, рейтинг общего соответствия резюме и вакансии
+  "strong": "ключевые сильные стороны кандидата",
+  "weak": "главные слабые стороны кандидата",
+  "matched_experience": "что из опыта соответствует роли",
+  "missing_experience": "что из опыта не соответствует роли",
+  "water": "есть ли лишняя 'вода' в резюме (коротко)",
+  "mismatches": "несоответствия",
+  "suspicious": "подозрительные моменты",
+  "interview_questions": ["вопрос 1", "вопрос 2", "вопрос 3"],
+  "interview_tips": "конкретные рекомендации к собеседованию (указать конкретные вопросы, которые стоит подготовить) (≤300 симв.)"
 }}
 
 Вакансия:
@@ -55,12 +62,11 @@ async def analyse_resume(resume: str, vacancy: str) -> dict[str, Any]:
 Резюме:
 {resume}
 """
-
     resp = await openai_client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.2,
-        max_tokens=300,
+        max_tokens=600,
         response_format={"type": "json_object"},
     )
     return json.loads(resp.choices[0].message.content)
@@ -90,8 +96,7 @@ async def process_resume(
         "vacancy": vacancy_name,
         "rating": score,
         "tag": tag_by_score(score),
-        "summary": analysis["summary"],
-        "interview_tips": analysis["interview_tips"],
+        **analysis,
         "file_path": file_path,
         "created_at": dt.datetime.utcnow().isoformat(),
     }
