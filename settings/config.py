@@ -15,7 +15,6 @@ class Settings(BaseSettings):
     data_dir: Path = Path("data") / "resumes"
     database_url: str | None = Field(None, env="DATABASE_URL")
 
-    # pydantic-settings конфигурация
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

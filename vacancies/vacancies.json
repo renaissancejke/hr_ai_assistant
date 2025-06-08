@@ -1,5 +1,6 @@
 {
   "Backend Python": "Требования: 3+ года Python, опыт Flask/FastAPI, Docker, PostgreSQL.",
   "Data Scientist": "Требования: опыт ML, Python, pandas, sklearn, знание SQL.",
-  "Project Manager": "Требования: Опыт работы в маркетинге и управления проектами от 1 года, опыт работы в команде."
+  "Project Manager": "Требования: Опыт работы в маркетинге и управления проектами от 1 года, опыт работы в команде.",
+  "Java Developer": "Требования: 1+ год Java, опыт Spring, Docker, PostgreSQL, JDBC, hibernate."
 }
