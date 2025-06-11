@@ -16,7 +16,7 @@ from .errors import InvalidResumeError
 
 class ResumeService:
 
-    THANKS_IMG = Path("data/static/thanks.png")
+    THANKS_IMG = Path("data/static/thanks_ice.png")
 
     @staticmethod
     def _ts() -> str:

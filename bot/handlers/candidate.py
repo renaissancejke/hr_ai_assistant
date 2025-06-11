@@ -4,6 +4,7 @@ import pathlib
 from typing import Any
 
 from aiogram import F, Router, types
+from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
@@ -17,7 +18,8 @@ router = Router()
 
 MSG_WELCOME = (
     "Привет! 👋\n"
-    "Я помогу сопоставить ваше резюме с открытыми вакансиями RakeStep.\n\n"
+    'Я, AI-HR-бот компании <a href="https://dodigital.ru/">Dodigital</a>. '
+    "Присылай мне свое резюме и я помогу тебе устроиться в компанию на работу.\n\n"
     "👇 Выберите интересующую вакансию:"
 )
 MSG_MENU_HELP = (
@@ -28,15 +30,21 @@ MSG_FMT_UNSUPPORTED = (
 )
 MSG_PROCESSING = "⚙️ Обрабатываем ваше резюме…"
 MSG_SUCCESS = (
-    "Спасибо! Мы свяжемся с вами после рассмотрения.\n"
-    "Подпишитесь на @rakestep, чтобы не пропустить новости."
+    "Спасибо! Мы свяжемся с вами после рассмотрения вашего резюме.\n\n"
+    'Подпишитесь на наш канал <a href="https://t.me/rakestep/">ICE breaker</a>, '
+    "чтобы не пропустить тренды и новости из мира ИИ, финтеха и блокчейна."
 )
 
 
 @router.message(CommandStart())
 async def cmd_start(m: types.Message, state: FSMContext) -> None:
     await state.clear()
-    await m.answer(MSG_WELCOME, reply_markup=vacancy_inline_kb())
+    await m.answer(
+        MSG_WELCOME,
+        reply_markup=vacancy_inline_kb(),
+        parse_mode=ParseMode.HTML,
+        disable_web_page_preview=True,
+    )
 
 
 @router.message(Command("info"))
@@ -45,7 +53,7 @@ async def cmd_info(m: types.Message) -> None:
         "ℹ️ Как пользоваться ботом:\n"
         "1️⃣ /start — выбрать вакансию\n"
         "2️⃣ Отправьте резюме (PDF/DOCX/TXT)\n"
-        "3️⃣ Получите обратную связь и рейтинг"
+        "3️⃣ Получите обратную связь"
     )
 
 
@@ -107,7 +115,7 @@ async def handle_document(m: types.Message, state: FSMContext) -> None:
         await processing.edit_text(f"😔 Недостаточно опыта: {lack}.")
         return
 
-    await processing.edit_text(MSG_SUCCESS)
+    await processing.edit_text(MSG_SUCCESS, disable_web_page_preview=True)
     if p := ResumeService.thanks_photo():
         await m.answer_photo(p)
 
@@ -118,7 +126,7 @@ async def handle_document(m: types.Message, state: FSMContext) -> None:
 
     await m.answer(
         "Хотите получить рекомендации для прохождения собеседования "
-        "от нашего ИИ-HR-агента?",
+        "от нашего AI—HR-бота?",
         reply_markup=GET_TIPS_KB,
     )
 
@@ -138,7 +146,7 @@ async def tips_handler(cb: types.CallbackQuery, state: FSMContext) -> None:
 
     if cb.data.endswith("yes"):
         tips = (await state.get_data()).get("interview_tips") or "Советов нет 🤷‍♂️"
-        await cb.message.answer(f"🤖 Советы ИИ-HR-агента:\n{tips}")
+        await cb.message.answer(f"🤖 Советы AI—HR-бота:\n{tips}")
     else:
         await cb.message.answer("Хорошо, будем на связи. Удачи!")
 
