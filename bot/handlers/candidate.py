@@ -35,6 +35,8 @@ MSG_SUCCESS = (
     "чтобы не пропустить тренды и новости из мира ИИ, финтеха и блокчейна."
 )
 
+CAPTION_LIMIT = 1024
+
 
 @router.message(CommandStart())
 async def cmd_start(m: types.Message, state: FSMContext) -> None:
@@ -131,9 +133,20 @@ async def handle_document(m: types.Message, state: FSMContext) -> None:
     )
 
     caption = ResumeService.build_hr_caption(vacancy, meta, m.from_user.username)
-    await m.bot.send_document(
-        setup.summary_chat_id, m.document.file_id, caption=caption
-    )
+    if len(caption) <= CAPTION_LIMIT:
+        await m.bot.send_document(
+            setup.summary_chat_id,
+            m.document.file_id,
+            caption=caption,
+            parse_mode=ParseMode.HTML if "<" in caption else None,
+        )
+    else:
+        await m.bot.send_document(setup.summary_chat_id, m.document.file_id)
+        await m.bot.send_message(
+            setup.summary_chat_id,
+            caption,
+            parse_mode=ParseMode.HTML if "<" in caption else None,
+        )
 
 
 @router.callback_query(F.data.startswith("tips|"))
