@@ -1,40 +1,107 @@
+from __future__ import annotations
+
+from collections import defaultdict
+from typing import List
+
 from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     KeyboardButton,
     ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
 )
 
-from vacancies import VACANCIES
-
-__all__ = ["POST_UPLOAD_KB", "vacancy_inline_kb"]
-
-POST_UPLOAD_KB: ReplyKeyboardMarkup = ReplyKeyboardMarkup(
-    keyboard=[
-        [
-            KeyboardButton(text="👀 Посмотреть вакансии"),
-            KeyboardButton(text="📄 Моё резюме"),
-        ]
-    ],
-    resize_keyboard=True,
-    is_persistent=True,
-)
+from services import CompanyService, VacancyService
+from db.models import Vacancy
 
 
-def vacancy_inline_kb() -> InlineKeyboardMarkup:
-    rows = [
-        [InlineKeyboardButton(text=name, callback_data=f"vac|{name}")]
-        for name in VACANCIES
-    ] or [[InlineKeyboardButton(text="Нет вакансий", callback_data="none")]]
+# клавиатура выбора роли
+
+
+def role_choice_kb() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text="Я HR"), KeyboardButton(text="Я соискатель")]],
+        resize_keyboard=True,
+        one_time_keyboard=True,
+    )
+
+
+# главное меню HR
+
+
+async def hr_main_kb(owner_id: int) -> ReplyKeyboardMarkup:
+    companies = await CompanyService.companies_for_user(owner_id)
+    have_companies = bool(companies)
+    have_vacancies = any(c.vacancies for c in companies)
+
+    rows: list[list[KeyboardButton]] = []
+
+    if have_companies:
+        rows.append([KeyboardButton(text="➕ Создать вакансию")])
+        if have_vacancies:
+            rows.append([KeyboardButton(text="✏️ Редактировать вакансии")])
+    else:
+        rows.append([KeyboardButton(text="🏢 Создать компанию")])
+
+    return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
+
+
+# скрыть обычную клавиатуру
+
+
+def remove_kb() -> ReplyKeyboardRemove:
+    return ReplyKeyboardRemove()
+
+
+# список вакансий
+
+
+async def vacancy_inline_kb(
+    owner_id: int | None = None,
+    mode: str = "view",
+) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+
+    if owner_id is not None:
+        mapping = await CompanyService.companies_with_vacancies(owner_id)
+        for company_name, vacancies in mapping.items():
+            rows.append(
+                [InlineKeyboardButton(text=f"🏢 {company_name}", callback_data="noop")]
+            )
+            for v in vacancies:
+                prefix = "edit_" if mode == "edit" else "vac_"
+                rows.append(
+                    [
+                        InlineKeyboardButton(
+                            text=f"— {v.title}",
+                            callback_data=f"{prefix}{v.id}",
+                        )
+                    ]
+                )
+
+    else:
+        vacancies: List[Vacancy] = await VacancyService.all_active()
+        grouped: dict[str, list[Vacancy]] = defaultdict(list)
+        for v in vacancies:
+            grouped[v.company.title].append(v)
+
+        for company_name in sorted(grouped.keys()):
+            rows.append(
+                [InlineKeyboardButton(text=f"🏢 {company_name}", callback_data="noop")]
+            )
+            for v in grouped[company_name]:
+                rows.append(
+                    [
+                        InlineKeyboardButton(
+                            text=f"— {v.title}",
+                            callback_data=f"vac_{v.id}",
+                        )
+                    ]
+                )
+
+    if not rows:
+        rows.append(
+            [InlineKeyboardButton(text="Нет открытых вакансий", callback_data="noop")]
+        )
 
     return InlineKeyboardMarkup(inline_keyboard=rows)
-
-
-GET_TIPS_KB = InlineKeyboardMarkup(
-    inline_keyboard=[
-        [
-            InlineKeyboardButton(text="✅ Да, хочу советы", callback_data="tips|yes"),
-            InlineKeyboardButton(text="❌ Нет, спасибо", callback_data="tips|no"),
-        ]
-    ]
-)
