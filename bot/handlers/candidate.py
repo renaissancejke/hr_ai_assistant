@@ -1,169 +1,82 @@
 from __future__ import annotations
 
-import pathlib
-from typing import Any
-
-from aiogram import F, Router, types
-from aiogram.enums import ParseMode
-from aiogram.exceptions import TelegramBadRequest
-from aiogram.filters import Command, CommandStart
+from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
-
-from bot.keyboards import GET_TIPS_KB, POST_UPLOAD_KB, vacancy_inline_kb
-from services import ResumeService
-from services.errors import InvalidResumeError
-from settings.config import setup
-
-router = Router()
-
-MSG_WELCOME = (
-    "Привет! 👋\n"
-    'Я, AI-HR-бот компании <a href="https://dodigital.ru/">Dodigital</a>. '
-    "Присылай мне свое резюме и я помогу тебе устроиться в компанию на работу.\n\n"
-    "👇 Выберите интересующую вакансию:"
-)
-MSG_MENU_HELP = (
-    "ℹ️ Команды:\n" "• /start — выбрать вакансию\n" "• /info  — как пользоваться ботом"
-)
-MSG_FMT_UNSUPPORTED = (
-    "❌ Этот формат не поддерживается. Пришлите PDF, DOC/DOCX или TXT-файл."
-)
-MSG_PROCESSING = "⚙️ Обрабатываем ваше резюме…"
-MSG_SUCCESS = (
-    "Спасибо! Мы свяжемся с вами после рассмотрения вашего резюме.\n\n"
-    'Подпишитесь на наш канал <a href="https://t.me/rakestep/">ICE breaker</a>, '
-    "чтобы не пропустить тренды и новости из мира ИИ, финтеха и блокчейна."
+from aiogram.types import (
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
 )
 
-CAPTION_LIMIT = 1024
+from bot.handlers.resume_fsm import ResumeFSM
+from bot.keyboards import vacancy_inline_kb
+from services import VacancyService
+
+router = Router(name="candidate")
 
 
-@router.message(CommandStart())
-async def cmd_start(m: types.Message, state: FSMContext) -> None:
-    await state.clear()
-    await m.answer(
-        MSG_WELCOME,
-        reply_markup=vacancy_inline_kb(),
-        parse_mode=ParseMode.HTML,
-        disable_web_page_preview=True,
-    )
+#  Карточка вакансии + кнопки
 
 
-@router.message(Command("info"))
-async def cmd_info(m: types.Message) -> None:
-    await m.answer(
-        "ℹ️ Как пользоваться ботом:\n"
-        "1️⃣ /start — выбрать вакансию\n"
-        "2️⃣ Отправьте резюме (PDF/DOCX/TXT)\n"
-        "3️⃣ Получите обратную связь"
-    )
-
-
-@router.message(F.text == "👀 Посмотреть вакансии")
-async def show_vacancies(m: types.Message) -> None:
-    await m.answer("Актуальные вакансии:", reply_markup=vacancy_inline_kb())
-
-
-@router.message(F.text == "📄 Моё резюме")
-async def send_my_resume(m: types.Message, state: FSMContext) -> None:
-    file_id = (await state.get_data()).get("resume_file_id")
-    (
-        await m.answer_document(file_id)
-        if file_id
-        else await m.answer("Вы ещё не отправляли резюме.")
-    )
-
-
-@router.callback_query(F.data.startswith("vac|"))
-async def choose_vacancy(cb: types.CallbackQuery, state: FSMContext) -> None:
-    _, vacancy = cb.data.split("|", 1)
-    await state.update_data(vacancy=vacancy)
-    await cb.message.edit_text(f"Вы выбрали <b>{vacancy}</b>.", parse_mode="HTML")
-    await cb.message.answer(
-        "Пришлите файл PDF, DOC/DOCX или TXT с резюме.",
-        reply_markup=POST_UPLOAD_KB,
-    )
-    await cb.answer()
-
-
-@router.message(F.document)
-async def handle_document(m: types.Message, state: FSMContext) -> None:
-    vacancy = (await state.get_data()).get("vacancy")
+@router.callback_query(F.data.startswith("vac_"))
+async def show_vacancy(cq: CallbackQuery) -> None:
+    vac_id = int(cq.data.split("_", 1)[1])
+    vacancy = await VacancyService.by_id(vac_id)
     if not vacancy:
-        return await m.answer("Сначала выберите вакансию через /start.")
-
-    ext = pathlib.Path(m.document.file_name or "").suffix.lower()
-    processing = await m.answer(MSG_PROCESSING)
-
-    try:
-        meta: dict[str, Any] = await ResumeService.evaluate(
-            bot=m.bot,
-            tg_file=await m.bot.get_file(m.document.file_id),
-            vacancy_name=vacancy,
-            ext=ext,
-            telegram_user_id=m.from_user.id,
-        )
-    except InvalidResumeError:
-        await processing.edit_text(
-            "Файл не похож на резюме 🤔\n"
-            "Пожалуйста, отправьте корректный PDF, DOCX или TXT с вашим опытом."
-        )
-        return
-    except ValueError:
-        return await m.answer(MSG_FMT_UNSUPPORTED)
-
-    if meta["rating"] < 40:
-        lack = ResumeService._humanize_missing(meta.get("missing_experience"))
-        await processing.edit_text(f"😔 Недостаточно опыта: {lack}.")
+        await cq.answer("Вакансия не найдена", show_alert=True)
         return
 
-    await processing.edit_text(MSG_SUCCESS, disable_web_page_preview=True)
-    if p := ResumeService.thanks_photo():
-        await m.answer_photo(p)
-
-    await state.update_data(
-        resume_file_id=m.document.file_id,
-        interview_tips=meta.get("interview_tips", ""),
+    text = (
+        f"<b>{vacancy.title}</b>\n\n"
+        f"{vacancy.description or 'Описание отсутствует.'}"
     )
-
-    await m.answer(
-        "Хотите получить рекомендации для прохождения собеседования "
-        "от нашего AI—HR-бота?",
-        reply_markup=GET_TIPS_KB,
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="📎 Откликнуться", callback_data=f"respond_{vacancy.id}"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="🔙 К списку вакансий", callback_data="back_vacancies"
+                )
+            ],
+        ]
     )
-
-    caption = ResumeService.build_hr_caption(vacancy, meta, m.from_user.username)
-    if len(caption) <= CAPTION_LIMIT:
-        await m.bot.send_document(
-            setup.summary_chat_id,
-            m.document.file_id,
-            caption=caption,
-            parse_mode=ParseMode.HTML if "<" in caption else None,
-        )
-    else:
-        await m.bot.send_document(setup.summary_chat_id, m.document.file_id)
-        await m.bot.send_message(
-            setup.summary_chat_id,
-            caption,
-            parse_mode=ParseMode.HTML if "<" in caption else None,
-        )
+    await cq.message.answer(text, reply_markup=kb, disable_web_page_preview=True)
+    await cq.answer()
 
 
-@router.callback_query(F.data.startswith("tips|"))
-async def tips_handler(cb: types.CallbackQuery, state: FSMContext) -> None:
+#  Кнопка «📎 Откликнуться»
+
+
+@router.callback_query(F.data.startswith("respond_"))
+async def start_respond(cb: CallbackQuery, state: FSMContext) -> None:
+    vac_id = int(cb.data.split("_", 1)[1])
+
+    vacancy = await VacancyService.by_id(vac_id)
+    if not vacancy:
+        await cb.answer("Вакансия не найдена", show_alert=True)
+        return
+
+    await state.update_data(vacancy_id=vac_id)
+    await state.set_state(ResumeFSM.waiting_for_file)
+
+    await cb.message.answer(
+        "Пришлите файл-резюме (PDF, DOC/DOCX или TXT).\n" "Если передумали — /cancel",
+    )
     await cb.answer()
-    try:
-        await cb.message.edit_reply_markup(reply_markup=None)
-    except TelegramBadRequest:
-        pass
 
-    if cb.data.endswith("yes"):
-        tips = (await state.get_data()).get("interview_tips") or "Советов нет 🤷‍♂️"
-        await cb.message.answer(f"🤖 Советы AI—HR-бота:\n{tips}")
+
+#  Кнопка «🔙 К списку вакансий»
+
+
+@router.callback_query(F.data == "back_vacancies")
+async def back_to_vacancies(cb: CallbackQuery) -> None:
+    kb = await vacancy_inline_kb()  # список всех активных вакансий
+    if kb.inline_keyboard:
+        await cb.message.answer("Выберите вакансию:", reply_markup=kb)
     else:
-        await cb.message.answer("Хорошо, будем на связи. Удачи!")
-
-
-@router.message()
-async def catch_all(m: types.Message) -> None:
-    await m.answer(MSG_MENU_HELP)
+        await cb.message.answer("Пока нет открытых вакансий.")
+    await cb.answer()

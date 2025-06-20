@@ -1,44 +1,32 @@
-import asyncio
-import logging
+# main.py
+from __future__ import annotations
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import BotCommand
 
-from bot.handlers.candidate import router as candidate_router
 from settings.config import setup
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="[%(asctime)s] %(levelname)s:%(name)s: %(message)s",
+from bot.handlers import (
+    candidate,
+    company_admin,
+    resume_fsm,
+    start,
+    noop,  # ← новый роутер-«заглушка»
 )
 
+bot = Bot(
+    token=setup.telegram_token,
+    default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+)
 
-async def main() -> None:
-    bot = Bot(
-        setup.telegram_token,
-        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
-    )
+dp = Dispatcher()
 
-    await bot.delete_webhook(drop_pending_updates=True)
-
-    dp = Dispatcher(storage=MemoryStorage())
-    dp.include_router(candidate_router)
-
-    await bot.set_my_commands(
-        [
-            BotCommand(command="start", description="начать работу"),
-            BotCommand(command="info", description="как пользоваться ботом"),
-        ]
-    )
-
-    await dp.start_polling(bot)
-
+# порядок не критичен, но оставим группами
+dp.include_router(company_admin.router)
+dp.include_router(candidate.router)
+dp.include_router(resume_fsm.router)
+dp.include_router(start.router)
+dp.include_router(noop.router)  # ← добавили
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except (KeyboardInterrupt, SystemExit):
-        print("Bye!")
+    dp.run_polling(bot)

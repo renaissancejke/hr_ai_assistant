@@ -1,14 +1,27 @@
-version: "3.13"
+version: "3.9"
 
 services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: hrbot
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
   bot:
     build: .
-    container_name: hr_assistant_bot
-    environment:
-      TELEGRAM_TOKEN:  "${TELEGRAM_TOKEN}"
-      OPENAI_API_KEY:  "${OPENAI_API_KEY}"
-      SUMMARY_CHAT_ID: "${SUMMARY_CHAT_ID}"
-      DATA_DIR:        "/data/resumes"
-    volumes:
-      - ./data:/data
+    env_file: .env          # DATABASE_URL и др.
+    depends_on:
+      db:
+        condition: service_healthy   # ждём healthcheck PG
     restart: unless-stopped
+
+volumes:
+  db_data:
