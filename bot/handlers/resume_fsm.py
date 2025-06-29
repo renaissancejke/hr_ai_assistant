@@ -17,11 +17,14 @@ from aiogram.types import (
     Message,
 )
 
-from bot.utils.resume_tools import analyse_resume, extract_text
+from bot.utils.resume_tools import (
+    analyse_resume,
+    extract_text,
+)
 from services import VacancyService
 from settings.config import setup
 
-router = Router(name="resume_flow")
+router = Router(name="resume_fsm")
 log = logging.getLogger(__name__)
 
 _tips_cache: Dict[str, str] = {}
@@ -35,10 +38,9 @@ def _humanize_missing(text: str | None) -> str:
     return text.strip() if text and text.strip() else "—"
 
 
-#  приём файла-резюме
 @router.message(ResumeFSM.waiting_for_file, F.document)
 async def handle_resume(m: Message, state: FSMContext) -> None:
-    vac_id = (await state.get_data())["vacancy_id"]
+    vac_id = (await state.get_data()).get("vacancy_id")
     processing = await m.answer("⏳ Обрабатываем резюме…")
 
     doc: Document = m.document
@@ -48,7 +50,13 @@ async def handle_resume(m: Message, state: FSMContext) -> None:
         return
 
     dst = pathlib.Path(setup.data_dir) / f"{uuid.uuid4().hex}{ext}"
-    await m.bot.download(doc, destination=dst)
+    try:
+        tg_file = await m.bot.get_file(doc.file_id)
+        await m.bot.download_file(tg_file.file_path, destination=str(dst))
+    except Exception as exc:
+        log.exception("download_file failed")
+        await processing.edit_text(f"Не удалось скачать файл: {exc}")
+        return
 
     try:
         cv_text = extract_text(dst)
@@ -71,7 +79,7 @@ async def handle_resume(m: Message, state: FSMContext) -> None:
         await state.clear()
         return
 
-    rating = float(meta["rating"])
+    rating = float(meta.get("rating", 0))
 
     if rating >= 40:
         token = uuid.uuid4().hex
@@ -107,8 +115,7 @@ async def handle_resume(m: Message, state: FSMContext) -> None:
 
     await state.clear()
 
-    # summary HR-чату
-    if setup.summary_chat_id:
+    if getattr(setup, "summary_chat_id", None):
         vac_tag = vacancy.title.replace(" ", "_")
         qs = meta.get("interview_questions", []) + ["—", "—", "—"]
         username = m.from_user.username or "—"
@@ -123,9 +130,8 @@ async def handle_resume(m: Message, state: FSMContext) -> None:
             f"💧 «Вода»: {meta.get('water', '—')}\n"
             f"⚠️ Несоответствия / подозрения: "
             f"{meta.get('mismatches') or meta.get('suspicious') or '—'}\n\n"
-            f"❓ Вопросы для собеседования:\n"
-            f"• {qs[0]}\n• {qs[1]}\n• {qs[2]}\n\n"
-            f"📱 Контакт: @{username}"
+            f"❓ Вопросы:\n• {qs[0]}\n• {qs[1]}\n• {qs[2]}\n\n"
+            f"📱 @{username}"
         )
         try:
             await m.bot.send_message(setup.summary_chat_id, summary)
@@ -135,20 +141,29 @@ async def handle_resume(m: Message, state: FSMContext) -> None:
 
 @router.callback_query(F.data.startswith("tips_no_"))
 async def skip_tips(cb: CallbackQuery) -> None:
+    try:
+        await cb.message.edit_reply_markup(reply_markup=None)  # убираем кнопки
+    except Exception:
+        pass
+
     await cb.message.answer("Хорошо, всего доброго!")
     _tips_cache.pop(cb.data.split("_", 2)[2], None)
     await cb.answer()
 
 
-#  получить советы
 @router.callback_query(F.data.startswith("tips_"))
 async def send_tips(cb: CallbackQuery) -> None:
+    try:
+        await cb.message.edit_reply_markup(reply_markup=None)  # убираем кнопки
+    except Exception:
+        pass
+
     token = cb.data.split("_", 1)[1]
     tips = _tips_cache.pop(token, None)
     if tips:
         await cb.message.answer(f"💡 Советы от AI-ассистента:\n\n{tips}")
     else:
-        await cb.message.answer("Советы уже были выданы или токен не найден.")
+        await cb.message.answer("Советы уже выданы или токен не найден.")
     await cb.answer()
 
 
